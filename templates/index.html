@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Analysis Assistant</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-center">Data Analysis Assistant</h1>
+        
+        <!-- File Upload Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload Dataset</h2>
+            <div class="flex items-center space-x-4">
+                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" class="border p-2 rounded">
+                <button onclick="uploadFile()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Upload
+                </button>
+            </div>
+            <div id="uploadStatus" class="mt-2 text-sm"></div>
+        </div>
+        
+        <!-- Analysis Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="analysisSection" style="display: none;">
+            <h2 class="text-xl font-semibold mb-4">Analysis</h2>
+            <div class="mb-4">
+                <textarea id="promptInput" placeholder="Enter your analysis prompt..." 
+                    class="w-full p-2 border rounded h-24"></textarea>
+            </div>
+            <button onclick="analyzeData()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Analyze
+            </button>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="bg-white rounded-lg shadow-md p-6" id="resultsSection" style="display: none;">
+            <h2 class="text-xl font-semibold mb-4">Results</h2>
+            
+            <!-- Analysis Text -->
+            <div class="mb-6">
+                <h3 class="font-semibold mb-2">Analysis:</h3>
+                <div id="analysisText" class="text-gray-700"></div>
+            </div>
+            
+            <!-- Key Insights -->
+            <div class="mb-6">
+                <h3 class="font-semibold mb-2">Key Insights:</h3>
+                <ul id="insightsList" class="list-disc pl-5 text-gray-700"></ul>
+            </div>
+            
+            <!-- Visualization -->
+            <div class="mb-6">
+                <h3 class="font-semibold mb-2">Visualization:</h3>
+                <div id="visualization"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFileName = '';
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files.length) {
+                statusDiv.innerHTML = '<span class="text-red-500">Please select a file</span>';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                statusDiv.innerHTML = '<span class="text-blue-500">Uploading...</span>';
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = '<span class="text-green-500">File uploaded successfully!</span>';
+                    currentFileName = fileInput.files[0].name;
+                    document.getElementById('analysisSection').style.display = 'block';
+                } else {
+                    statusDiv.innerHTML = `<span class="text-red-500">Error: ${result.error}</span>`;
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="text-red-500">Error: ${error.message}</span>`;
+            }
+        }
+
+        async function analyzeData() {
+            const promptInput = document.getElementById('promptInput');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            if (!promptInput.value.trim()) {
+                alert('Please enter an analysis prompt');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: promptInput.value,
+                        filename: currentFileName
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    alert(`Error: ${result.error}`);
+                    return;
+                }
+                
+                // Display results
+                document.getElementById('analysisText').textContent = result.analysis;
+                
+                const insightsList = document.getElementById('insightsList');
+                insightsList.innerHTML = result.insights.map(insight => 
+                    `<li>${insight}</li>`).join('');
+                
+                Plotly.newPlot('visualization', result.visualization.data, result.visualization.layout);
+                
+                resultsSection.style.display = 'block';
+                
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
